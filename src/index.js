@@ -491,7 +491,8 @@ class Offline {
             // Payload processing
             const encoding = utils.detectEncoding(request);
 
-            request.payload = request.payload && request.payload.toString(encoding);
+            // Removing the 'toString' call allows file upload to work
+            // request.payload = request.payload && request.payload.toString(encoding);
             request.rawPayload = request.payload;
 
             // Headers processing
