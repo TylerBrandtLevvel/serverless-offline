@@ -495,7 +495,7 @@ class Offline {
           config: routeConfig,
           handler: (request, reply) => { // Here we go
             // Payload processing
-            const encoding = utils.detectEncoding(request);
+            // const encoding = utils.detectEncoding(request);
 
             // Removing the 'toString' call allows file upload to work
             // request.payload = request.payload && request.payload.toString(encoding);
