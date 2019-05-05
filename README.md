@@ -1,3 +1,6 @@
+# Notes about this fork
+This fork was created with a change in how POST/PUT/etc. request bodies are passed into your serverless application. Instead of passing request bodies as a string, the raw stream is passed into your application to better emulate the way that api gateway will pass them. This is due to a line in the createRoutes function in the index file that calls `toString(encoding)` on the incoming stream, which will corrupt binary file uploads due to utf-8 encoding by the toString function.  
+
 # Serverless Offline
 
 [![serverless](http://public.serverless.com/badges/v3.svg)](http://www.serverless.com)
