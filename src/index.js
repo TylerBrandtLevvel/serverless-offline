@@ -90,6 +90,10 @@ class Offline {
             usage: 'Disable the timeout feature.',
             shortcut: 't',
           },
+          binPath: {
+            usage: 'Path to the Serverless binary.',
+            shortcut: 'b',
+          },
           noEnvironment: {
             usage: 'Turns off loading of your environment variables from serverless.yml. Allows the usage of tools such as PM2 or docker-compose.',
           },
@@ -270,11 +274,12 @@ class Offline {
       disableModelValidation: false,
     };
 
-    this.options = Object.assign({}, defaultOptions, (this.service.custom || {})['serverless-offline'], this.options);
-
     // In the constructor, stage and regions are set to undefined
-    if (!this.options.stage) this.options.stage = this.service.provider.stage;
-    if (!this.options.region) this.options.region = this.service.provider.region;
+    if (this.options.stage === undefined) delete this.options.stage;
+    if (this.options.region === undefined) delete this.options.region;
+
+    const yamlOptions = (this.service.custom || {})['serverless-offline'];
+    this.options = Object.assign({}, defaultOptions, yamlOptions, this.options);
 
     // Prefix must start and end with '/'
     if (!this.options.prefix.startsWith('/')) this.options.prefix = `/${this.options.prefix}`;
@@ -404,6 +409,7 @@ class Offline {
       this.serverlessLog(`Routes for ${funName}:`);
 
       // Adds a route for each http endpoint
+      // eslint-disable-next-line
       (fun.events && fun.events.length || this.serverlessLog('(none)')) && fun.events.forEach(event => {
         if (!event.http) return this.serverlessLog('(none)');
 
@@ -648,7 +654,7 @@ class Offline {
             debugLog('event:', event);
 
             // We create the context, its callback (context.done/succeed/fail) will send the HTTP response
-            const lambdaContext = createLambdaContext(fun, (err, data, fromPromise) => {
+            const lambdaContext = createLambdaContext(fun, this.service.provider, (err, data, fromPromise) => {
               // Everything in this block happens once the lambda function has resolved
               debugLog('_____ HANDLER RESOLVED _____');
 
@@ -788,7 +794,7 @@ class Offline {
 
               if (integration === 'lambda') {
 
-                const endpointResponseHeaders = endpoint.response ? endpoint.response.headers : {};
+                const endpointResponseHeaders = (endpoint.response && endpoint.response.headers) || {};
 
                 Object.keys(endpointResponseHeaders)
                   .filter(key => typeof endpointResponseHeaders[key] === 'string' && /^'.*?'$/.test(endpointResponseHeaders[key]))
@@ -1159,9 +1165,11 @@ class Offline {
           Object.keys(params).forEach(key => {
             resultUri = resultUri.replace(`{${key}}`, params[key]);
           });
+
           if (request.url.search !== null) {
             resultUri += request.url.search; // search is empty string by default
           }
+
           this.serverlessLog(`PROXY ${request.method} ${request.url.path} -> ${resultUri}`);
           reply.proxy({ uri: resultUri, passThrough: true });
         },
@@ -1201,6 +1209,7 @@ class Offline {
   }
 
   _logAndExit() {
+    // eslint-disable-next-line
     console.log.apply(null, arguments);
     process.exit(0);
   }

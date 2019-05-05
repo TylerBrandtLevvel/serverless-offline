@@ -11,7 +11,7 @@ function createAuthScheme(
   authorizerOptions,
   funName,
   endpointPath,
-  options, 
+  options,
   serverlessLog,
   servicePath,
   serviceRuntime,
@@ -48,7 +48,8 @@ function createAuthScheme(
         pathParams[key] = encodeURIComponent(request.params[key]);
       });
 
-      let event, handler;
+      let event;
+      let handler;
 
       // Create event Object for authFunction
       //   methodArn is the ARN of the function we are running we are authorizing access to (or not)
@@ -77,7 +78,7 @@ function createAuthScheme(
       }
       else {
         const authorization = req.headers[identityHeader];
-        
+
         const matchedAuthorization = authorization && authorization.match(authorizerOptions.identityValidationExpression);
         const finalAuthorization = (matchedAuthorization && matchedAuthorization[1]) || '';
         debugLog(`Retrieved ${identityHeader} header ${finalAuthorization}`);
@@ -116,7 +117,7 @@ function createAuthScheme(
 
       let done = false;
       // Creat the Lambda Context for the Auth function
-      const lambdaContext = createLambdaContext(authFun, (err, result, fromPromise) => {
+      const lambdaContext = createLambdaContext(authFun, serverless.service.provider, (err, result, fromPromise) => {
         if (done) {
           const warning = fromPromise
             ? `Warning: Auth function '${authFunName}' returned a promise and also uses a callback!\nThis is problematic and might cause issues in your lambda.`
