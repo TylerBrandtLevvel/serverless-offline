@@ -1,17 +1,15 @@
-const Velocity = require('velocityjs');
-const utils = require('./utils');
-const debugLog = require('./debugLog');
-const stringPollution = require('./javaHelpers');
+'use strict';
 
-const Compile = Velocity.Compile;
-const parse = Velocity.parse;
+const { Compile, parse } = require('velocityjs');
+const { isPlainObject } = require('./utils');
+const debugLog = require('./debugLog');
+const runInPollutedScope = require('./javaHelpers');
 
 function tryToParseJSON(string) {
   let parsed;
   try {
     parsed = JSON.parse(string);
-  }
-  catch (err) {
+  } catch (err) {
     // nothing! Some things are not meant to be parsed.
   }
 
@@ -19,24 +17,23 @@ function tryToParseJSON(string) {
 }
 
 function renderVelocityString(velocityString, context) {
-
-  // Add Java helpers to String prototype
-  stringPollution.polluteStringPrototype();
-
-  // This line can throw, but this function does not handle errors
-  // Quick args explanation:
-  // { escape: false } --> otherwise would escape &, < and > chars with html (&amp;, &lt; and &gt;)
-  // render(context, null, true) --> null: no custom macros; true: silent mode, just like APIG
-  const renderResult = (new Compile(parse(velocityString), { escape: false })).render(context, null, true);
-
-  // Remove Java helpers from String prototype
-  stringPollution.depolluteStringPrototype();
+  // runs in a "polluted" (extended) String.prototype replacement scope
+  const renderResult = runInPollutedScope(() =>
+    // This line can throw, but this function does not handle errors
+    // Quick args explanation:
+    // { escape: false } --> otherwise would escape &, < and > chars with html (&amp;, &lt; and &gt;)
+    // render(context, null, true) --> null: no custom macros; true: silent mode, just like APIG
+    new Compile(parse(velocityString), { escape: false }).render(
+      context,
+      null,
+      true,
+    ),
+  );
 
   debugLog('Velocity rendered:', renderResult || 'undefined');
 
   // Haaaa Velocity... this language sure loves strings a lot
   switch (renderResult) {
-
     case 'undefined':
       return undefined; // But we don't, we want JavaScript types
 
@@ -58,8 +55,10 @@ function renderVelocityString(velocityString, context) {
   Deeply traverses a Serverless-style JSON (Velocity) template
   When it finds a string, assumes it's Velocity language and renders it.
 */
-module.exports = function renderVelocityTemplateObject(templateObject, context) {
-
+module.exports = function renderVelocityTemplateObject(
+  templateObject,
+  context,
+) {
   const result = {};
   let toProcess = templateObject;
 
@@ -67,17 +66,16 @@ module.exports = function renderVelocityTemplateObject(templateObject, context) 
   if (typeof toProcess === 'string') toProcess = tryToParseJSON(toProcess);
 
   // Let's check again
-  if (utils.isPlainObject(toProcess)) {
-    for (let key in toProcess) { // eslint-disable-line prefer-const
-
+  if (isPlainObject(toProcess)) {
+    for (const key in toProcess) {
       const value = toProcess[key];
       debugLog('Processing key:', key, '- value:', value);
 
-      if (typeof value === 'string') result[key] = renderVelocityString(value, context);
-
+      if (typeof value === 'string')
+        result[key] = renderVelocityString(value, context);
       // Go deeper
-      else if (utils.isPlainObject(value)) result[key] = renderVelocityTemplateObject(value, context);
-
+      else if (isPlainObject(value))
+        result[key] = renderVelocityTemplateObject(value, context);
       // This should never happen: value should either be a string or a plain object
       else result[key] = value;
     }
@@ -85,11 +83,12 @@ module.exports = function renderVelocityTemplateObject(templateObject, context) 
 
   // Still a string? Maybe it's some complex Velocity stuff
   else if (typeof toProcess === 'string') {
-
     // If the plugin threw here then you should consider reviewing your template or posting an issue.
-    const alternativeResult = tryToParseJSON(renderVelocityString(toProcess, context));
+    const alternativeResult = tryToParseJSON(
+      renderVelocityString(toProcess, context),
+    );
 
-    return utils.isPlainObject(alternativeResult) ? alternativeResult : result;
+    return isPlainObject(alternativeResult) ? alternativeResult : result;
   }
 
   return result;
